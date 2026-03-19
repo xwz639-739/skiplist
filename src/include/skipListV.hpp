@@ -4,56 +4,57 @@
 #include <cstdlib>
 #include <mutex>
 #include <shared_mutex>
+#include <fstream>
+#include <string>
 
 namespace SL
 {
-    static int MAX_LEVEL = 18;
-
-    static void setMaxLevel(int level) { MAX_LEVEL = level; }
-
     template <typename T>
-    struct Node
+    struct NodeV
     {
         T _data;
         size_t _hv;
         int _level;
-        std::vector<Node<T> *> next;
-        Node(T data) : _data(data), _hv(std::hash<T>{}(data))
+        std::vector<NodeV<T> *> next;
+        NodeV(T data, int level) : _data(data), _hv(std::hash<T>{}(data))
         {
-            next.resize(MAX_LEVEL, nullptr);
+            next.resize(level, nullptr);
         };
     };
 
     template <typename T>
-    class SkipList
+    class SkipListV
     {
     public:
-        SkipList()
+        SkipListV(int level = 18)
         {
-            _dummyhead = new Node<T>(T());
+            setMaxLevel(level);
+            _dummyhead = new NodeV<T>(T(), level);
             _dummyhead->_level = MAX_LEVEL;
             _dummyhead->_hv = 0;
             _dummyhead->next.resize(MAX_LEVEL, nullptr);
         }
 
-        ~SkipList()
+        ~SkipListV()
         {
-            Node<T> *current = _dummyhead;
+            NodeV<T> *current = _dummyhead;
             while (current != nullptr)
             {
-                Node<T> *next = current->next[0];
+                NodeV<T> *next = current->next[0];
                 delete current;
                 current = next;
             }
         }
 
+        void setMaxLevel(int level) { MAX_LEVEL = level; }
+
         void insert(T data)
         {
-            Node<T> *newnode = new Node<T>(data);
+            NodeV<T> *newnode = new NodeV<T>(data, MAX_LEVEL);
             newnode->_level = getRandomLevel();
 
-            Node<T> *current = _dummyhead;
-            std::vector<Node<T> *> update(MAX_LEVEL, nullptr);
+            NodeV<T> *current = _dummyhead;
+            std::vector<NodeV<T> *> update(MAX_LEVEL, nullptr);
 
             // 从最高层开始查找插入位置
             for (int i = MAX_LEVEL - 1; i >= 0; i--)
@@ -78,6 +79,7 @@ namespace SL
                 newnode->next[i] = update[i]->next[i];
                 update[i]->next[i] = newnode;
             }
+            _size++;
         }
 
         void insertl(T data)
@@ -88,7 +90,7 @@ namespace SL
 
         bool search(T data)
         {
-            Node<T> *prenode = getPreNode(data);
+            NodeV<T> *prenode = getPreNode(data);
             return prenode != nullptr;
         }
 
@@ -100,8 +102,8 @@ namespace SL
 
         bool remove(T data)
         {
-            Node<T> *current = _dummyhead;
-            std::vector<Node<T> *> update(MAX_LEVEL, nullptr);
+            NodeV<T> *current = _dummyhead;
+            std::vector<NodeV<T> *> update(MAX_LEVEL, nullptr);
 
             // 从最高层开始查找要删除的节点
             for (int i = MAX_LEVEL - 1; i >= 0; i--)
@@ -143,6 +145,7 @@ namespace SL
             }
 
             delete current;
+            _size--;
             return true; // 成功删除
         }
 
@@ -158,8 +161,8 @@ namespace SL
             if (sortBaseOnHash)
             {
                 // 对于基于哈希的比较，需要先找到节点，然后直接修改数据
-                Node<T> *current = _dummyhead;
-                std::vector<Node<T> *> update(MAX_LEVEL, nullptr);
+                NodeV<T> *current = _dummyhead;
+                std::vector<NodeV<T> *> update(MAX_LEVEL, nullptr);
 
                 // 从最高层开始查找要更新的节点
                 for (int i = MAX_LEVEL - 1; i >= 0; i--)
@@ -203,12 +206,63 @@ namespace SL
             return update(olddata, newdata);
         }
 
-        void setSortBaseOnHash(bool sort) { sortBaseOnHash = sort; }
+        void setSortBaseOnHash(bool sort)
+        {
+            if (_size == 0)
+                sortBaseOnHash = sort;
+        }
+
+        void setStorageFile(std::string file) { _storageFile = file; }
+
+        void saveToFile()
+        {
+            if (_storageFile.empty())
+                return;
+            std::ofstream outfile(_storageFile, std::ios::binary);
+            if (!outfile.is_open())
+            {
+                std::cerr << "Error: Could not open file " << _storageFile << " for writing." << std::endl;
+                return;
+            }
+
+            NodeV<T> *current = _dummyhead->next[0];
+            while (current != nullptr)
+            {
+                outfile << current->_data << std::endl;
+                current = current->next[0];
+            }
+
+            outfile.close();
+        }
+
+        void loadFromFile()
+        {
+            if (_storageFile.empty())
+                return;
+            std::ifstream infile(_storageFile, std::ios::binary);
+            if (!infile.is_open())
+            {
+                std::cerr << "Error: Could not open file " << _storageFile << " for reading." << std::endl;
+                return;
+            }
+
+            T data;
+            while (infile >> data)
+            {
+                insert(data);
+            }
+
+            infile.close();
+        }
 
     private:
-        Node<T> *_dummyhead;
+        NodeV<T> *_dummyhead;
         bool sortBaseOnHash = false; // no sort base on hash, so base on data default compare
         std::shared_mutex _mutex;
+        size_t _size = 0;
+        std::string _storageFile = "";
+
+        int MAX_LEVEL = 18;
 
         int getRandomLevel()
         {
@@ -220,7 +274,7 @@ namespace SL
             return level;
         }
 
-        int compareByHash(const Node<T> *lnode, const T rdata) const
+        int compareByHash(const NodeV<T> *lnode, const T rdata) const
         {
             const size_t rnodehv = std::hash<T>{}(rdata);
             if (lnode->_hv == rnodehv)
@@ -235,13 +289,13 @@ namespace SL
             return 1;
         }
 
-        int compareByHashl(const Node<T> *lnode, const T rdata) const
+        int compareByHashl(const NodeV<T> *lnode, const T rdata) const
         {
             std::lock_guard<std::shared_mutex> lock(_mutex);
             return compareByHash(lnode, rdata);
         }
 
-        int compareByData(const Node<T> *lnode, T rnodedata) const
+        int compareByData(const NodeV<T> *lnode, T rnodedata) const
         {
             if (lnode->_data == rnodedata)
                 return 0;
@@ -250,15 +304,15 @@ namespace SL
             return 1;
         }
 
-        int compareByDatal(const Node<T> *lnode, T rnodedata) const
+        int compareByDatal(const NodeV<T> *lnode, T rnodedata) const
         {
             std::lock_guard<std::shared_mutex> lock(_mutex);
             return compareByData(lnode, rnodedata);
         }
 
-        Node<T> *getPreNode(T data)
+        NodeV<T> *getPreNode(T data)
         {
-            Node<T> *current = _dummyhead;
+            NodeV<T> *current = _dummyhead;
 
             // 从最高层开始查找
             for (int i = MAX_LEVEL - 1; i >= 0; i--)
@@ -267,7 +321,7 @@ namespace SL
                 while (current->next[i] != nullptr)
                 {
                     // 安全地获取下一个节点
-                    Node<T> *next_node = current->next[i];
+                    NodeV<T> *next_node = current->next[i];
 
                     // 检查节点是否有效且小于目标数据/哈希值
                     if (sortBaseOnHash ? compareByHash(next_node, data) < 0 : compareByData(next_node, data) < 0)
@@ -291,7 +345,7 @@ namespace SL
             return nullptr;
         }
 
-        Node<T> *getPreNodel(T data)
+        NodeV<T> *getPreNodel(T data)
         {
             std::lock_guard<std::shared_mutex> lock(_mutex);
             return getPreNode(data);

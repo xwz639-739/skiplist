@@ -24,36 +24,35 @@
 
 ### 单线程极限性能（基于哈希比较）
 
-| 操作类型 | QPS                   | 平均延迟   | 时间复杂度 |
+| 操作类型 | QPS                   | 平均延迟    | 时间复杂度 |
 | :------- | :-------------------- | :--------- | :--------- |
-| **插入** | **1,010,101** ops/sec | **0.99μs** | O(log n)   |
-| **查找** | **1,428,571** ops/sec | **0.70μs** | O(log n)   |
-| **更新** | **1,000,000** ops/sec | **1.0μs**  | O(log n)   |
-| **删除** | **909,091** ops/sec   | **1.1μs**  | O(log n)   |
+| **插入** | **1,639,344** ops/sec | **0.61μs** | O(log n)   |
+| **查找** | **943,396** ops/sec   | **1.06μs** | O(log n)   |
+| **更新** | **1,612,903** ops/sec | **0.62μs** | O(log n)   |
+| **删除** | **4,166,666** ops/sec | **0.24μs** | O(log n)   |
 
 ### 单线程性能（基于数据比较）
 
-| 操作类型 | QPS                   | 平均延迟   | 时间复杂度 |
+| 操作类型 | QPS                   | 平均延迟    | 时间复杂度 |
 | :------- | :-------------------- | :--------- | :--------- |
-| **插入** | **2,000,000** ops/sec | **0.5μs**  | O(log n)   |
-| **查找** | **1,162,791** ops/sec | **0.86μs** | O(log n)   |
-| **更新** | **526,316** ops/sec   | **1.9μs**  | O(log n)   |
-| **删除** | **1,000,000** ops/sec | **1.0μs**  | O(log n)   |
+| **插入** | **2,173,913** ops/sec | **0.46μs** | O(log n)   |
+| **查找** | **1,190,476** ops/sec | **0.84μs** | O(log n)   |
+| **更新** | **568,181** ops/sec   | **1.76μs** | O(log n)   |
+| **删除** | **1,219,512** ops/sec | **0.82μs** | O(log n)   |
 
 ### 多线程并发性能（8 线程）
 
 | 测试场景     | 总操作数 | 吞吐量              | 平均延迟   | 线程安全  |
 | :----------- | :------- | :------------------ | :--------- | :-------- |
-| 并发混合操作 | 30,000   | **408,163** ops/sec | **2.45μs** | ✅ 零冲突 |
-| 并发压力测试 | 40,000   | **408,163** ops/sec | **2.45μs** | ✅ 零冲突 |
+| 并发压力测试 | 40,000   | **701,754** ops/sec | **1.425μs** | ✅ 零冲突 |
 
 ### 大规模 QPS 测试（最新结果）
-
-| 数据规模   | 写 QPS    | 读 QPS    | 混合 QPS | 读/写比    | 扩展性衰减 |
-| :--------- | :-------- | :-------- | :------- | :--------- | :--------- |
-| **10 万**  | 1,010,101 | 1,428,571 | 909,091  | **1.41:1** | 基准       |
-| **50 万**  | 615,764   | 670,241   | 588,235  | **1.09:1** | -39%       |
-| **100 万** | 522,466   | 543,478   | 416,667  | **1.04:1** | -54%       |
+扩展性衰减 = [(当前写QPS/基准写QPS) + (当前读QPS/基准读QPS)] / 2 - 1
+| 数据规模    | 写 QPS    | 读 QPS    | 读/写比     | 扩展性衰减 |
+| :--------- | :-------- | :-------- | :--------- | :--------- |
+| **10 万**  | 1,282,051 | 1,492,537 | **1.16:1** | 基准       |
+| **50 万**  | 653,595   | 768,049   | **1.18:1** | -48.8%     |
+| **100 万** | 537,346   | 591,716   | **1.05:1** | -59.3%     |
 
 ## 🏗️ 项目结构
 
@@ -63,7 +62,8 @@ Skipping-List/
 │   ├── include/
 │   │   └── skipList.h     # 跳表头文件（模板实现）
 │   └── lib/
-│       └── skipList.cpp   # 跳表实现文件
+│       └── skipListV.cpp   # 跳表(值)模板实现文件
+│       └── skipListKV.cpp  # 跳表(键值对)模板实现文件
 ├── test/                   # 测试代码
 │   ├── test.cpp           # 完整测试套件
 │   └── CMakeLists.txt     # 测试构建配置
@@ -89,50 +89,50 @@ make -j$(nproc)
 ./test/SkippingList_test
 
 # 运行特定测试
-./test/SkippingList_test --gtest_filter="SkipListTest.LargeScaleQPSTest"
+./test/SkippingList_test --gtest_filter="SkipListVTest.LargeScaleQPSTest"
 ```
 
 ### 基本使用示例
 
 ```cpp
-#include "skipList.h"
+#include "skipListV.h"
 
 // 创建跳表实例
-SL::SkipList<int> skiplist;
+SL::SkipListV<int> skiplistV;
 
 // 插入数据
-skiplist.insert(42);
-skiplist.insert(17);
-skiplist.insert(99);
+skiplistV.insert(42);
+skiplistV.insert(17);
+skiplistV.insert(99);
 
 // 查找数据
-bool found = skiplist.search(42);  // 返回 true
+bool found = skiplistV.search(42);  // 返回 true
 
 // 更新数据
-skiplist.update(17, 25);
+skiplistV.update(17, 25);
 
 // 删除数据
-skiplist.remove(99);
+skiplistV.remove(99);
 ```
 
 ### 多线程使用
 
 ```cpp
 // 线程安全操作（带'l'后缀）
-SL::SkipList<int> skiplist;
+SL::SkipListV<int> skiplistV;
 
 // 并发插入
-std::thread t1([&](){ skiplist.insertl(1); });
-std::thread t2([&](){ skiplist.insertl(2); });
+std::thread t1([&](){ skiplistV.insertl(1); });
+std::thread t2([&](){ skiplistV.insertl(2); });
 
 // 并发查找
-bool found = skiplist.searchl(1);
+bool found = skiplistV.searchl(1);
 
 // 并发更新
-skiplist.updatel(1, 10);
+skiplistV.updatel(1, 10);
 
 // 并发删除
-skiplist.removel(2);
+skiplistV.removel(2);
 ```
 
 ### 自定义数据类型
@@ -160,8 +160,8 @@ namespace std {
     };
 }
 
-SL::SkipList<Person> personList;
-personList.insert(Person{1, "Alice"});
+SL::SkipListV<Person> personListV;
+personListV.insert(Person{1, "Alice"});
 ```
 
 ## 🧪 测试覆盖
@@ -215,11 +215,19 @@ const double P = 0.5;          // 晋升概率
 ### 内存布局
 
 ```cpp
-struct Node {
+struct NodeV {
     T _data;                    // 数据存储
     size_t _hv;                 // 哈希值缓存
     int _level;                 // 节点层级
-    std::vector<Node*> next;    // 前向指针数组
+    std::vector<NodeV*> next;    // 前向指针数组
+};
+
+struct NodeKV {
+        K _key;
+        V _value;
+        size_t _hv;
+        int _level;
+        std::vector<NodeKV<K, V> *> next;
 };
 ```
 

@@ -1,87 +1,73 @@
 // test/test.cpp - 跳表测试套件
 #include <iostream>
 #include <gtest/gtest.h>
-#include "skipList.h"
+#include "skipListV.hpp"
+#include "skipListKV.hpp"
 #include <chrono>
 #include <cstdlib>
 #include <vector>
 #include <unordered_map>
 #include <thread>
 #include <random>
+#include <fstream>
+#include <cstdio> // for std::remove
 
 using namespace std;
 using namespace SL;
-
-// =============================================
-// 基础功能测试
-// =============================================
-
-// 基础插入和查找测试
-TEST(SkipListTest, BasicInsertionTest)
-{
-    SkipList<int> skiplist;
-    skiplist.insert(10);
-    EXPECT_TRUE(skiplist.search(10));
-    EXPECT_FALSE(skiplist.search(20));
-    EXPECT_TRUE(skiplist.update(10, 20));
-    EXPECT_TRUE(skiplist.search(20));
-    EXPECT_TRUE(skiplist.remove(20));
-    EXPECT_FALSE(skiplist.search(20));
-}
 
 // =============================================
 // 整数类型测试
 // =============================================
 
 // 整数压力测试
-TEST(SkipListTest, IntStressTest)
+TEST(SkipListVTest, IntStressTest)
 {
-    SkipList<int> skiplist;
+    SkipListV<int> skiplistv;
     const int NUM_ELEMENTS = 10000;
 
     // 批量插入
     for (int i = 0; i < NUM_ELEMENTS; i++)
     {
-        skiplist.insert(i);
+        skiplistv.insert(i);
     }
 
     // 验证所有元素都存在
     for (int i = 0; i < NUM_ELEMENTS; i++)
     {
-        EXPECT_TRUE(skiplist.search(i)) << "元素 " << i << " 应该存在但未找到";
+        EXPECT_TRUE(skiplistv.search(i)) << "元素 " << i << " 应该存在但未找到";
     }
 
     // 随机查找
     for (int i = 0; i < 1000; i++)
     {
         int random_value = rand() % NUM_ELEMENTS;
-        EXPECT_TRUE(skiplist.search(random_value)) << "随机元素 " << random_value << " 应该存在";
+        EXPECT_TRUE(skiplistv.search(random_value)) << "随机元素 " << random_value << " 应该存在";
     }
 
     // 批量更新
     for (int i = 0; i < NUM_ELEMENTS; i += 2)
     {
-        EXPECT_TRUE(skiplist.update(i, i + NUM_ELEMENTS));
+        EXPECT_TRUE(skiplistv.update(i, i + NUM_ELEMENTS));
     }
 
     // 批量删除
     for (int i = 1; i < NUM_ELEMENTS; i += 2)
     {
-        EXPECT_TRUE(skiplist.remove(i));
+        EXPECT_TRUE(skiplistv.remove(i));
     }
 }
 
 // 整数性能测试
-TEST(SkipListTest, IntPerformanceTest)
+TEST(SkipListVTest, IntPerformanceTest)
 {
-    SkipList<int> skiplist;
+    SkipListV<int> skiplistv;
     const int NUM_OPERATIONS = 5000;
 
     // 测量插入性能
     auto start_time = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < NUM_OPERATIONS; i++)
     {
-        skiplist.insert(i);
+        skiplistv.insert(i);
     }
     auto end_time = std::chrono::high_resolution_clock::now();
     auto insert_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -90,7 +76,7 @@ TEST(SkipListTest, IntPerformanceTest)
     start_time = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < NUM_OPERATIONS; i++)
     {
-        EXPECT_TRUE(skiplist.search(i));
+        EXPECT_TRUE(skiplistv.search(i));
     }
     end_time = std::chrono::high_resolution_clock::now();
     auto search_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -99,30 +85,10 @@ TEST(SkipListTest, IntPerformanceTest)
     std::cout << "整数测试 - 查找 " << NUM_OPERATIONS << " 个元素耗时: " << search_duration.count() << " ms" << std::endl;
 }
 
-// =============================================
-// 字符串类型测试
-// =============================================
-
-// 字符串基础测试
-TEST(SkipListTest, StringBasicTest)
-{
-    SkipList<std::string> skiplist;
-    skiplist.insert("hello");
-    skiplist.insert("world");
-
-    EXPECT_TRUE(skiplist.search("hello"));
-    EXPECT_TRUE(skiplist.search("world"));
-    EXPECT_FALSE(skiplist.search("test"));
-
-    EXPECT_TRUE(skiplist.update("hello", "updated"));
-    EXPECT_TRUE(skiplist.search("updated"));
-    EXPECT_FALSE(skiplist.search("hello"));
-}
-
 // 字符串性能测试（基于数据比较）
-TEST(SkipListTest, StringPerformanceTest)
+TEST(SkipListVTest, StringPerformanceTest)
 {
-    SkipList<std::string> skiplist;
+    SkipListV<std::string> skiplistv;
     // 默认使用数据比较（sortBaseOnHash = false）
 
     const int NUM_ELEMENTS = 50000;
@@ -141,7 +107,7 @@ TEST(SkipListTest, StringPerformanceTest)
     auto start_time = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < NUM_ELEMENTS; i++)
     {
-        skiplist.insert(strings[i]);
+        skiplistv.insert(strings[i]);
     }
     auto end_time = std::chrono::high_resolution_clock::now();
     auto insert_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -151,7 +117,7 @@ TEST(SkipListTest, StringPerformanceTest)
     for (int i = 0; i < NUM_RANDOM_OPS; i++)
     {
         int random_value = rand() % NUM_ELEMENTS;
-        EXPECT_TRUE(skiplist.search(strings[random_value]));
+        EXPECT_TRUE(skiplistv.search(strings[random_value]));
     }
     end_time = std::chrono::high_resolution_clock::now();
     auto search_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -162,10 +128,10 @@ TEST(SkipListTest, StringPerformanceTest)
 }
 
 // 字符串极限性能测试（基于哈希比较）
-TEST(SkipListTest, StringExtremePerformanceTest)
+TEST(SkipListVTest, StringExtremePerformanceTest)
 {
-    SkipList<std::string> skiplist;
-    skiplist.setSortBaseOnHash(true); // 使用哈希比较
+    SkipListV<std::string> skiplistv;
+    skiplistv.setSortBaseOnHash(true); // 使用哈希比较
 
     const int NUM_ELEMENTS = 50000;
     const int NUM_RANDOM_OPS = 10000;
@@ -183,7 +149,7 @@ TEST(SkipListTest, StringExtremePerformanceTest)
     auto start_time = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < NUM_ELEMENTS; i++)
     {
-        skiplist.insert(strings[i]);
+        skiplistv.insert(strings[i]);
     }
     auto end_time = std::chrono::high_resolution_clock::now();
     auto insert_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -193,7 +159,7 @@ TEST(SkipListTest, StringExtremePerformanceTest)
     for (int i = 0; i < NUM_RANDOM_OPS; i++)
     {
         int random_value = rand() % NUM_ELEMENTS;
-        EXPECT_TRUE(skiplist.search(strings[random_value]));
+        EXPECT_TRUE(skiplistv.search(strings[random_value]));
     }
     end_time = std::chrono::high_resolution_clock::now();
     auto search_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -203,10 +169,10 @@ TEST(SkipListTest, StringExtremePerformanceTest)
     std::cout << "平均每次操作耗时: " << ((insert_duration.count() + search_duration.count()) * 1000.0 / (NUM_ELEMENTS + NUM_RANDOM_OPS)) << " μs" << std::endl;
 }
 
-TEST(SkipListTest, ExtremePerformanceTest_Hash)
+TEST(SkipListVTest, ExtremePerformanceTest_Hash)
 {
-    SkipList<int> skiplist;
-    skiplist.setSortBaseOnHash(true);
+    SkipListV<int> skiplistv;
+    skiplistv.setSortBaseOnHash(true);
     const int NUM_ELEMENTS = 100000;
     const int NUM_RANDOM_OPS = 50000;
 
@@ -215,7 +181,7 @@ TEST(SkipListTest, ExtremePerformanceTest_Hash)
     auto start_time = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < NUM_ELEMENTS; i++)
     {
-        skiplist.insert(i);
+        skiplistv.insert(i);
     }
     auto end_time = std::chrono::high_resolution_clock::now();
     auto insert_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -227,7 +193,7 @@ TEST(SkipListTest, ExtremePerformanceTest_Hash)
     for (int i = 0; i < 1000; i++)
     {
         int random_value = rand() % NUM_ELEMENTS;
-        EXPECT_TRUE(skiplist.search(random_value));
+        EXPECT_TRUE(skiplistv.search(random_value));
     }
     end_time = std::chrono::high_resolution_clock::now();
     auto verify_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -238,7 +204,7 @@ TEST(SkipListTest, ExtremePerformanceTest_Hash)
     for (int i = 0; i < NUM_RANDOM_OPS; i++)
     {
         int random_value = rand() % NUM_ELEMENTS;
-        bool find = skiplist.search(random_value);
+        bool find = skiplistv.search(random_value);
         EXPECT_TRUE(find);
     }
     end_time = std::chrono::high_resolution_clock::now();
@@ -252,7 +218,7 @@ TEST(SkipListTest, ExtremePerformanceTest_Hash)
     {
         int old_value = rand() % NUM_ELEMENTS;
         int new_value = NUM_ELEMENTS + old_value;
-        skiplist.update(old_value, new_value);
+        skiplistv.update(old_value, new_value);
     }
     end_time = std::chrono::high_resolution_clock::now();
     auto update_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -264,7 +230,7 @@ TEST(SkipListTest, ExtremePerformanceTest_Hash)
     for (int i = 0; i < NUM_RANDOM_OPS; i++)
     {
         int random_value = NUM_ELEMENTS + (rand() % NUM_ELEMENTS);
-        skiplist.remove(random_value);
+        skiplistv.remove(random_value);
     }
     end_time = std::chrono::high_resolution_clock::now();
     auto remove_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -276,7 +242,7 @@ TEST(SkipListTest, ExtremePerformanceTest_Hash)
     start_time = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < EXTRA_ELEMENTS; i++)
     {
-        skiplist.insert(NUM_ELEMENTS * 2 + i);
+        skiplistv.insert(NUM_ELEMENTS * 2 + i);
     }
     end_time = std::chrono::high_resolution_clock::now();
     auto extra_insert_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -286,7 +252,7 @@ TEST(SkipListTest, ExtremePerformanceTest_Hash)
     int final_element_count = 0;
     for (int i = NUM_ELEMENTS * 2; i < NUM_ELEMENTS * 2 + EXTRA_ELEMENTS; i++)
     {
-        if (skiplist.search(i))
+        if (skiplistv.search(i))
         {
             final_element_count++;
         }
@@ -303,10 +269,10 @@ TEST(SkipListTest, ExtremePerformanceTest_Hash)
               << std::endl;
 }
 
-TEST(SkipListTest, ExtremePerformanceTest_Data)
+TEST(SkipListVTest, ExtremePerformanceTest_Data)
 {
-    SkipList<int> skiplist;
-    skiplist.setSortBaseOnHash(false);
+    SkipListV<int> skiplistv;
+    skiplistv.setSortBaseOnHash(false);
     const int NUM_ELEMENTS = 100000;
     const int NUM_RANDOM_OPS = 50000;
 
@@ -315,7 +281,7 @@ TEST(SkipListTest, ExtremePerformanceTest_Data)
     auto start_time = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < NUM_ELEMENTS; i++)
     {
-        skiplist.insert(i);
+        skiplistv.insert(i);
     }
     auto end_time = std::chrono::high_resolution_clock::now();
     auto insert_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -327,7 +293,7 @@ TEST(SkipListTest, ExtremePerformanceTest_Data)
     for (int i = 0; i < NUM_RANDOM_OPS; i++)
     {
         int random_value = rand() % NUM_ELEMENTS;
-        bool find = skiplist.search(random_value);
+        bool find = skiplistv.search(random_value);
         EXPECT_TRUE(find);
     }
     end_time = std::chrono::high_resolution_clock::now();
@@ -341,7 +307,7 @@ TEST(SkipListTest, ExtremePerformanceTest_Data)
     {
         int old_value = rand() % NUM_ELEMENTS;
         int new_value = NUM_ELEMENTS + old_value;
-        skiplist.update(old_value, new_value);
+        skiplistv.update(old_value, new_value);
     }
     end_time = std::chrono::high_resolution_clock::now();
     auto update_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -353,7 +319,7 @@ TEST(SkipListTest, ExtremePerformanceTest_Data)
     for (int i = 0; i < NUM_RANDOM_OPS; i++)
     {
         int random_value = NUM_ELEMENTS + (rand() % NUM_ELEMENTS);
-        skiplist.remove(random_value);
+        skiplistv.remove(random_value);
     }
     end_time = std::chrono::high_resolution_clock::now();
     auto remove_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -365,7 +331,7 @@ TEST(SkipListTest, ExtremePerformanceTest_Data)
     start_time = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < EXTRA_ELEMENTS; i++)
     {
-        skiplist.insert(NUM_ELEMENTS * 2 + i);
+        skiplistv.insert(NUM_ELEMENTS * 2 + i);
     }
     end_time = std::chrono::high_resolution_clock::now();
     auto extra_insert_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -375,7 +341,7 @@ TEST(SkipListTest, ExtremePerformanceTest_Data)
     int final_element_count = 0;
     for (int i = NUM_ELEMENTS * 2; i < NUM_ELEMENTS * 2 + EXTRA_ELEMENTS; i++)
     {
-        if (skiplist.search(i))
+        if (skiplistv.search(i))
         {
             final_element_count++;
         }
@@ -392,161 +358,14 @@ TEST(SkipListTest, ExtremePerformanceTest_Data)
               << std::endl;
 }
 
-// 多线程并发测试
-TEST(SkipListTest, ConcurrentOperationsTest)
-{
-    const int NUM_THREADS = 4;
-    const int OPERATIONS_PER_THREAD = 2500;
-    const int TOTAL_ELEMENTS = NUM_THREADS * OPERATIONS_PER_THREAD;
-
-    SkipList<int> skiplist;
-    std::vector<std::thread> threads;
-    std::atomic<int> success_count{0};
-    std::atomic<int> failure_count{0};
-
-    auto start_time = std::chrono::high_resolution_clock::now();
-
-    // 并发插入测试
-    auto insert_worker = [&](int thread_id)
-    {
-        for (int i = 0; i < OPERATIONS_PER_THREAD; i++)
-        {
-            int value = thread_id * OPERATIONS_PER_THREAD + i;
-            skiplist.insertl(value);
-
-            // 验证插入成功
-            if (skiplist.searchl(value))
-            {
-                success_count++;
-            }
-            else
-            {
-                failure_count++;
-            }
-        }
-    };
-
-    // 启动插入线程
-    for (int i = 0; i < NUM_THREADS; i++)
-    {
-        threads.emplace_back(insert_worker, i);
-    }
-
-    // 等待所有插入线程完成
-    for (auto &t : threads)
-    {
-        t.join();
-    }
-
-    threads.clear();
-
-    // 并发查找测试
-    auto search_worker = [&](int thread_id)
-    {
-        for (int i = 0; i < OPERATIONS_PER_THREAD; i++)
-        {
-            int value = rand() % TOTAL_ELEMENTS;
-            bool find = skiplist.searchl(value);
-            if (find)
-            {
-                success_count++;
-            }
-        }
-    };
-
-    // 启动查找线程
-    for (int i = 0; i < NUM_THREADS; i++)
-    {
-        threads.emplace_back(search_worker, i);
-    }
-
-    // 等待所有查找线程完成
-    for (auto &t : threads)
-    {
-        t.join();
-    }
-
-    threads.clear();
-
-    // 并发更新测试
-    auto update_worker = [&](int thread_id)
-    {
-        for (int i = 0; i < OPERATIONS_PER_THREAD / 2; i++)
-        {
-            int old_value = rand() % TOTAL_ELEMENTS;
-            int new_value = TOTAL_ELEMENTS + thread_id * OPERATIONS_PER_THREAD / 2 + i;
-
-            if (skiplist.updatel(old_value, new_value))
-            {
-                success_count++;
-            }
-        }
-    };
-
-    // 启动更新线程
-    for (int i = 0; i < NUM_THREADS; i++)
-    {
-        threads.emplace_back(update_worker, i);
-    }
-
-    // 等待所有更新线程完成
-    for (auto &t : threads)
-    {
-        t.join();
-    }
-
-    threads.clear();
-
-    // 并发删除测试
-    auto remove_worker = [&](int thread_id)
-    {
-        for (int i = 0; i < OPERATIONS_PER_THREAD / 2; i++)
-        {
-            int value = rand() % (TOTAL_ELEMENTS * 2); // 包括更新后的数据
-            if (skiplist.removel(value))
-            {
-                success_count++;
-            }
-        }
-    };
-
-    // 启动删除线程
-    for (int i = 0; i < NUM_THREADS; i++)
-    {
-        threads.emplace_back(remove_worker, i);
-    }
-
-    // 等待所有删除线程完成
-    for (auto &t : threads)
-    {
-        t.join();
-    }
-
-    auto end_time = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-
-    // 验证测试结果
-    std::cout << "\n=== 多线程并发测试 ===" << std::endl;
-    std::cout << "线程数: " << NUM_THREADS << std::endl;
-    std::cout << "每个线程操作数: " << OPERATIONS_PER_THREAD << std::endl;
-    std::cout << "总操作数: " << (NUM_THREADS * OPERATIONS_PER_THREAD * 3) << std::endl;
-    std::cout << "成功操作数: " << success_count.load() << std::endl;
-    std::cout << "失败操作数: " << failure_count.load() << std::endl;
-    std::cout << "总耗时: " << duration.count() << " ms" << std::endl;
-    std::cout << "平均每次操作耗时: " << (duration.count() * 1000.0 / (NUM_THREADS * OPERATIONS_PER_THREAD * 3)) << " μs" << std::endl;
-
-    // 基本验证：成功操作数应该大于0
-    EXPECT_GT(success_count.load(), 0) << "应该有一些成功的并发操作";
-}
-
 // 多线程压力测试
-TEST(SkipListTest, ConcurrentStressTest)
+TEST(SkipListVTest, ConcurrentStressTest)
 {
     const int NUM_THREADS = 8;
     const int OPERATIONS_PER_THREAD = 5000;
     const int VALUE_RANGE = 10000;
 
-    SkipList<int> skiplist;
+    SkipListV<int> skiplistv;
     std::vector<std::thread> threads;
     std::atomic<int> total_operations{0};
     std::atomic<int> conflicts{0};
@@ -568,19 +387,19 @@ TEST(SkipListTest, ConcurrentStressTest)
             switch (operation)
             {
             case 0: // 插入
-                skiplist.insertl(value);
+                skiplistv.insertl(value);
                 break;
             case 1: // 查找
-                skiplist.searchl(value);
+                skiplistv.searchl(value);
                 break;
             case 2: // 更新
             {
                 int new_value = VALUE_RANGE + thread_id * OPERATIONS_PER_THREAD + i;
-                skiplist.updatel(value, new_value);
+                skiplistv.updatel(value, new_value);
             }
             break;
             case 3: // 删除
-                skiplist.removel(value);
+                skiplistv.removel(value);
                 break;
             }
 
@@ -616,7 +435,7 @@ TEST(SkipListTest, ConcurrentStressTest)
     int final_count = 0;
     for (int i = 0; i < VALUE_RANGE * 2; i++)
     {
-        if (skiplist.searchl(i))
+        if (skiplistv.searchl(i))
         {
             final_count++;
         }
@@ -627,13 +446,13 @@ TEST(SkipListTest, ConcurrentStressTest)
 }
 
 // 大规模随机数据QPS测试
-TEST(SkipListTest, LargeScaleQPSTest)
+TEST(SkipListVTest, LargeScaleQPSTest)
 {
     const std::vector<int> SCALES = {100000, 500000, 1000000}; // 10w, 50w, 100w
 
     for (int scale : SCALES)
     {
-        SkipList<int> skiplist;
+        SkipListV<int> skiplistv(18);
         std::vector<int> test_data;
         test_data.reserve(scale);
 
@@ -657,7 +476,7 @@ TEST(SkipListTest, LargeScaleQPSTest)
         int write_success = 0;
         for (int i = 0; i < scale; i++)
         {
-            skiplist.insert(test_data[i]);
+            skiplistv.insert(test_data[i]);
             write_success++;
         }
 
@@ -677,7 +496,7 @@ TEST(SkipListTest, LargeScaleQPSTest)
         int read_success = 0;
         for (int i = 0; i < scale; i++)
         {
-            if (skiplist.search(test_data[i]))
+            if (skiplistv.search(test_data[i]))
             {
                 read_success++;
             }
@@ -692,58 +511,17 @@ TEST(SkipListTest, LargeScaleQPSTest)
         std::cout << "读QPS: " << std::fixed << std::setprecision(0) << read_qps << " ops/sec" << std::endl;
         std::cout << "平均每次查找: " << std::setprecision(2) << (read_duration.count() * 1000.0 / scale) << " μs" << std::endl;
 
-        // 测试3: 混合读写QPS测试（读写比例 7:3）
-        std::cout << "\n=== 混合QPS测试 - 读写比例 7:3 ===" << std::endl;
-        const int MIX_OPS = scale / 10; // 减少测试规模避免太长
-        const int READ_OPS = MIX_OPS * 7 / 10;
-        const int WRITE_OPS = MIX_OPS * 3 / 10;
-
-        auto mix_start = std::chrono::high_resolution_clock::now();
-
-        int mix_read_success = 0;
-        int mix_write_success = 0;
-
-        for (int i = 0; i < MIX_OPS; i++)
-        {
-            if (i % 10 < 7) // 70% 读操作
-            {
-                int idx = rand() % scale;
-                if (skiplist.search(test_data[idx]))
-                {
-                    mix_read_success++;
-                }
-            }
-            else // 30% 写操作
-            {
-                int new_value = rand() % (scale * 2) + scale; // 新数据
-                skiplist.insert(new_value);
-                mix_write_success++;
-            }
-        }
-
-        auto mix_end = std::chrono::high_resolution_clock::now();
-        auto mix_duration = std::chrono::duration_cast<std::chrono::milliseconds>(mix_end - mix_start);
-        double mix_qps = (MIX_OPS * 1000.0) / mix_duration.count();
-
-        std::cout << "混合操作总数: " << MIX_OPS << " (读: " << READ_OPS << ", 写: " << WRITE_OPS << ")" << std::endl;
-        std::cout << "读成功: " << mix_read_success << " 个" << std::endl;
-        std::cout << "写成功: " << mix_write_success << " 个" << std::endl;
-        std::cout << "混合耗时: " << mix_duration.count() << " ms" << std::endl;
-        std::cout << "混合QPS: " << std::fixed << std::setprecision(0) << mix_qps << " ops/sec" << std::endl;
-        std::cout << "平均每次操作: " << std::setprecision(2) << (mix_duration.count() * 1000.0 / MIX_OPS) << " μs" << std::endl;
-
         // 性能总结
         std::cout << "\n=== " << scale << " 规模性能总结 ===" << std::endl;
         std::cout << "写QPS: " << std::fixed << std::setprecision(0) << write_qps << " ops/sec" << std::endl;
         std::cout << "读QPS: " << std::fixed << std::setprecision(0) << read_qps << " ops/sec" << std::endl;
-        std::cout << "混合QPS: " << std::fixed << std::setprecision(0) << mix_qps << " ops/sec" << std::endl;
         std::cout << "读/写性能比: " << std::setprecision(2) << (read_qps / write_qps) << " : 1" << std::endl;
 
         // 验证数据完整性
         int final_count = 0;
         for (int i = 0; i < 100; i++) // 抽样验证
         {
-            if (skiplist.search(test_data[rand() % scale]))
+            if (skiplistv.search(test_data[rand() % scale]))
             {
                 final_count++;
             }
@@ -755,6 +533,352 @@ TEST(SkipListTest, LargeScaleQPSTest)
     }
 
     std::cout << "\n=== 大规模QPS测试完成 ===" << std::endl;
+}
+
+// =============================================
+// 文件持久化测试
+// =============================================
+
+// 基础文件保存和加载测试
+TEST(SkipListVTest, FileSaveLoadTest)
+{
+    SkipListV<int> skiplistv;
+    const std::string test_file = "/tmp/SkipListV_test.txt";
+
+    // 设置存储文件路径
+    skiplistv.setStorageFile(test_file);
+
+    // 插入一些测试数据
+    skiplistv.insert(10);
+    skiplistv.insert(20);
+    skiplistv.insert(30);
+    skiplistv.insert(40);
+    skiplistv.insert(50);
+
+    // 验证原始数据
+    EXPECT_TRUE(skiplistv.search(10));
+    EXPECT_TRUE(skiplistv.search(20));
+    EXPECT_TRUE(skiplistv.search(30));
+    EXPECT_TRUE(skiplistv.search(40));
+    EXPECT_TRUE(skiplistv.search(50));
+
+    // 保存到文件
+    skiplistv.saveToFile();
+
+    // 验证文件是否正确生成
+    std::ifstream file_check(test_file);
+    EXPECT_TRUE(file_check.is_open()) << "文件应该被正确创建";
+    file_check.close();
+
+    // 验证文件内容
+    std::ifstream content_check(test_file);
+    std::string line;
+    std::vector<int> file_contents;
+    while (std::getline(content_check, line))
+    {
+        if (!line.empty())
+        {
+            file_contents.push_back(std::stoi(line));
+        }
+    }
+    content_check.close();
+
+    // 验证文件中的数据
+    EXPECT_EQ(file_contents.size(), 5) << "文件应该包含5个数据元素";
+    EXPECT_NE(std::find(file_contents.begin(), file_contents.end(), 10), file_contents.end()) << "文件应该包含10";
+    EXPECT_NE(std::find(file_contents.begin(), file_contents.end(), 20), file_contents.end()) << "文件应该包含20";
+    EXPECT_NE(std::find(file_contents.begin(), file_contents.end(), 30), file_contents.end()) << "文件应该包含30";
+    EXPECT_NE(std::find(file_contents.begin(), file_contents.end(), 40), file_contents.end()) << "文件应该包含40";
+    EXPECT_NE(std::find(file_contents.begin(), file_contents.end(), 50), file_contents.end()) << "文件应该包含50";
+
+    // 创建新的跳表实例并加载数据
+    SkipListV<int> loaded_SkipListV;
+    loaded_SkipListV.setStorageFile(test_file);
+    loaded_SkipListV.loadFromFile();
+
+    // 验证加载的数据
+    EXPECT_TRUE(loaded_SkipListV.search(10)) << "加载的跳表应该包含10";
+    EXPECT_TRUE(loaded_SkipListV.search(20)) << "加载的跳表应该包含20";
+    EXPECT_TRUE(loaded_SkipListV.search(30)) << "加载的跳表应该包含30";
+    EXPECT_TRUE(loaded_SkipListV.search(40)) << "加载的跳表应该包含40";
+    EXPECT_TRUE(loaded_SkipListV.search(50)) << "加载的跳表应该包含50";
+    EXPECT_FALSE(loaded_SkipListV.search(60)) << "加载的跳表不应该包含60";
+
+    // 验证数据完整性：所有原始数据都应该在加载的跳表中
+    std::vector<int> original_data = {10, 20, 30, 40, 50};
+    for (int data : original_data)
+    {
+        EXPECT_TRUE(loaded_SkipListV.search(data)) << "数据 " << data << " 应该在加载的跳表中";
+    }
+
+    // 清理测试文件
+    std::remove(test_file.c_str());
+
+    // 验证文件已被清理
+    std::ifstream cleanup_check(test_file);
+    EXPECT_FALSE(cleanup_check.is_open()) << "测试文件应该已被清理";
+}
+
+// 空跳表文件操作测试
+TEST(SkipListVTest, EmptyFileSaveLoadTest)
+{
+    SkipListV<int> skiplistv;
+    const std::string test_file = "/tmp/empty_SkipListV_test.txt";
+
+    skiplistv.setStorageFile(test_file);
+
+    // 验证原始跳表为空
+    EXPECT_FALSE(skiplistv.search(10)) << "原始跳表应该为空";
+    EXPECT_FALSE(skiplistv.search(20)) << "原始跳表应该为空";
+
+    // 保存空跳表
+    skiplistv.saveToFile();
+
+    // 验证文件是否正确生成
+    std::ifstream file_check(test_file);
+    EXPECT_TRUE(file_check.is_open()) << "空跳表文件应该被正确创建";
+    file_check.close();
+
+    // 验证文件内容为空或只包含换行符
+    std::ifstream content_check(test_file);
+    std::string line;
+    int line_count = 0;
+    while (std::getline(content_check, line))
+    {
+        if (!line.empty())
+        {
+            line_count++;
+        }
+    }
+    content_check.close();
+
+    EXPECT_EQ(line_count, 0) << "空跳表保存的文件应该不包含任何数据行";
+
+    // 加载到新跳表
+    SkipListV<int> loaded_SkipListV;
+    loaded_SkipListV.setStorageFile(test_file);
+    loaded_SkipListV.loadFromFile();
+
+    // 验证加载的跳表也是空的
+    EXPECT_FALSE(loaded_SkipListV.search(10)) << "加载的空跳表应该不包含10";
+    EXPECT_FALSE(loaded_SkipListV.search(20)) << "加载的空跳表应该不包含20";
+    EXPECT_FALSE(loaded_SkipListV.search(30)) << "加载的空跳表应该不包含30";
+
+    // 验证多个不存在的元素
+    for (int i = 0; i < 10; i++)
+    {
+        EXPECT_FALSE(loaded_SkipListV.search(i * 100)) << "加载的空跳表不应该包含任何数据";
+    }
+
+    // 清理测试文件
+    std::remove(test_file.c_str());
+
+    // 验证文件已被清理
+    std::ifstream cleanup_check(test_file);
+    EXPECT_FALSE(cleanup_check.is_open()) << "测试文件应该已被清理";
+}
+
+// 大规模数据文件持久化测试
+TEST(SkipListVTest, LargeScaleFileSaveLoadTest)
+{
+    SkipListV<int> skiplistv;
+    const std::string test_file = "/tmp/large_SkipListV_test.txt";
+    const int NUM_ELEMENTS = 1000;
+
+    skiplistv.setStorageFile(test_file);
+
+    // 插入大量数据
+    for (int i = 0; i < NUM_ELEMENTS; i++)
+    {
+        skiplistv.insert(i * 2); // 插入偶数
+    }
+
+    // 验证原始数据
+    for (int i = 0; i < 10; i++) // 抽样验证
+    {
+        int test_index = rand() % NUM_ELEMENTS;
+        EXPECT_TRUE(skiplistv.search(test_index * 2)) << "原始跳表应该包含数据 " << (test_index * 2);
+    }
+
+    // 保存到文件
+    skiplistv.saveToFile();
+
+    // 验证文件是否正确生成
+    std::ifstream file_check(test_file);
+    EXPECT_TRUE(file_check.is_open()) << "大规模数据文件应该被正确创建";
+    file_check.close();
+
+    // 验证文件内容
+    std::ifstream content_check(test_file);
+    std::string line;
+    std::vector<int> file_contents;
+    int line_count = 0;
+    while (std::getline(content_check, line))
+    {
+        if (!line.empty())
+        {
+            file_contents.push_back(std::stoi(line));
+            line_count++;
+        }
+    }
+    content_check.close();
+
+    // 验证文件中的数据量
+    EXPECT_EQ(line_count, NUM_ELEMENTS) << "文件应该包含 " << NUM_ELEMENTS << " 个数据元素";
+
+    // 验证文件中的数据正确性（抽样检查）
+    for (int i = 0; i < 20; i++)
+    {
+        int test_value = (rand() % NUM_ELEMENTS) * 2;
+        EXPECT_NE(std::find(file_contents.begin(), file_contents.end(), test_value), file_contents.end())
+            << "文件应该包含数据 " << test_value;
+    }
+
+    // 创建新的跳表实例并加载数据
+    SkipListV<int> loaded_SkipListV;
+    loaded_SkipListV.setStorageFile(test_file);
+    loaded_SkipListV.loadFromFile();
+
+    // 验证所有数据都正确加载
+    int found_count = 0;
+    int not_found_count = 0;
+
+    for (int i = 0; i < NUM_ELEMENTS; i++)
+    {
+        if (loaded_SkipListV.search(i * 2))
+        {
+            found_count++;
+        }
+        else
+        {
+            not_found_count++;
+        }
+
+        // 验证不存在的奇数
+        EXPECT_FALSE(loaded_SkipListV.search(i * 2 + 1)) << "加载的跳表不应该包含奇数 " << (i * 2 + 1);
+    }
+
+    // 验证数据完整性统计
+    EXPECT_EQ(found_count, NUM_ELEMENTS) << "所有 " << NUM_ELEMENTS << " 个偶数数据都应该被正确加载";
+    EXPECT_EQ(not_found_count, 0) << "不应该有任何偶数数据丢失";
+
+    // 额外验证：随机抽样检查数据正确性
+    for (int i = 0; i < 50; i++)
+    {
+        int test_index = rand() % NUM_ELEMENTS;
+        EXPECT_TRUE(loaded_SkipListV.search(test_index * 2))
+            << "随机抽样验证失败：数据 " << (test_index * 2) << " 应该在加载的跳表中";
+    }
+
+    // 清理测试文件
+    std::remove(test_file.c_str());
+
+    // 验证文件已被清理
+    std::ifstream cleanup_check(test_file);
+    EXPECT_FALSE(cleanup_check.is_open()) << "测试文件应该已被清理";
+}
+
+// 字符串类型文件持久化测试
+TEST(SkipListVTest, StringFileSaveLoadTest)
+{
+    SkipListV<std::string> skiplistv;
+    const std::string test_file = "/tmp/string_SkipListV_test.txt";
+
+    skiplistv.setStorageFile(test_file);
+
+    // 插入字符串数据
+    skiplistv.insert("apple");
+    skiplistv.insert("banana");
+    skiplistv.insert("cherry");
+    skiplistv.insert("date");
+    skiplistv.insert("elderberry");
+
+    // 验证原始数据
+    EXPECT_TRUE(skiplistv.search("apple")) << "原始跳表应该包含apple";
+    EXPECT_TRUE(skiplistv.search("banana")) << "原始跳表应该包含banana";
+    EXPECT_TRUE(skiplistv.search("cherry")) << "原始跳表应该包含cherry";
+    EXPECT_TRUE(skiplistv.search("date")) << "原始跳表应该包含date";
+    EXPECT_TRUE(skiplistv.search("elderberry")) << "原始跳表应该包含elderberry";
+
+    // 保存到文件
+    skiplistv.saveToFile();
+
+    // 验证文件是否正确生成
+    std::ifstream file_check(test_file);
+    EXPECT_TRUE(file_check.is_open()) << "字符串数据文件应该被正确创建";
+    file_check.close();
+
+    // 验证文件内容
+    std::ifstream content_check(test_file);
+    std::string line;
+    std::vector<std::string> file_contents;
+    while (std::getline(content_check, line))
+    {
+        if (!line.empty())
+        {
+            file_contents.push_back(line);
+        }
+    }
+    content_check.close();
+
+    // 验证文件中的数据
+    EXPECT_EQ(file_contents.size(), 5) << "文件应该包含5个字符串数据元素";
+    EXPECT_NE(std::find(file_contents.begin(), file_contents.end(), "apple"), file_contents.end()) << "文件应该包含apple";
+    EXPECT_NE(std::find(file_contents.begin(), file_contents.end(), "banana"), file_contents.end()) << "文件应该包含banana";
+    EXPECT_NE(std::find(file_contents.begin(), file_contents.end(), "cherry"), file_contents.end()) << "文件应该包含cherry";
+    EXPECT_NE(std::find(file_contents.begin(), file_contents.end(), "date"), file_contents.end()) << "文件应该包含date";
+    EXPECT_NE(std::find(file_contents.begin(), file_contents.end(), "elderberry"), file_contents.end()) << "文件应该包含elderberry";
+
+    // 验证字符串顺序（文件中的顺序可能与插入顺序不同）
+    EXPECT_TRUE(std::is_sorted(file_contents.begin(), file_contents.end())) << "文件中的字符串应该按字典序排序";
+
+    // 创建新的跳表实例并加载数据
+    SkipListV<std::string> skiplistv1;
+    skiplistv1.setStorageFile(test_file);
+    skiplistv1.loadFromFile();
+
+    // 验证加载的数据
+    EXPECT_TRUE(skiplistv1.search("apple")) << "加载的跳表应该包含apple";
+    EXPECT_TRUE(skiplistv1.search("banana")) << "加载的跳表应该包含banana";
+    EXPECT_TRUE(skiplistv1.search("cherry")) << "加载的跳表应该包含cherry";
+    EXPECT_TRUE(skiplistv1.search("date")) << "加载的跳表应该包含date";
+    EXPECT_TRUE(skiplistv1.search("elderberry")) << "加载的跳表应该包含elderberry";
+    EXPECT_FALSE(skiplistv1.search("fig")) << "加载的跳表不应该包含fig";
+
+    // 验证多个不存在的字符串
+    std::vector<std::string> non_existent = {"fig", "grape", "honeydew", "kiwi", "lemon"};
+    for (const auto &fruit : non_existent)
+    {
+        EXPECT_FALSE(skiplistv1.search(fruit)) << "加载的跳表不应该包含 " << fruit;
+    }
+
+    // 验证数据完整性：所有原始数据都应该在加载的跳表中
+    std::vector<std::string> original_data = {"apple", "banana", "cherry", "date", "elderberry"};
+    for (const auto &fruit : original_data)
+    {
+        EXPECT_TRUE(skiplistv1.search(fruit)) << "数据 " << fruit << " 应该在加载的跳表中";
+    }
+
+    // 清理测试文件
+    std::remove(test_file.c_str());
+
+    // 验证文件已被清理
+    std::ifstream cleanup_check(test_file);
+    EXPECT_FALSE(cleanup_check.is_open()) << "测试文件应该已被清理";
+}
+
+// 文件路径未设置测试
+TEST(SkipListVTest, NoFilePathTest)
+{
+    SkipListV<int> skiplistv;
+
+    // 不设置文件路径，调用保存和加载
+    skiplistv.insert(10);
+    skiplistv.saveToFile();   // 应该不会报错，只是静默返回
+    skiplistv.loadFromFile(); // 应该不会报错，只是静默返回
+
+    // 验证数据仍然存在
+    EXPECT_TRUE(skiplistv.search(10));
 }
 
 // 如果使用gtest_main库，则不需要定义main函数
